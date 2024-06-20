@@ -1,16 +1,18 @@
 #include <WiFi.h>           //Library WiFi for esp32
 #include <PubSubClient.h>
-#include <ArduinoJson.h>
+#include <ArduinoJson.h>    //https://arduinojson.org/
 
 //--------------------------------------------Variable Declaration[CanEdit]--------------------------------------------
 
 //Variable for Subscription Example 1 --> Topic: "PiaHouse/bedroom/temperature"
 double temperature;
 
-//Variable for Subscription Example 3--> Topic: "FRA503/MaxMinNumber"
-char json[100];
-double Max1;
-double Min1;
+//Variable for Subscription Example 3--> Topic: "PiaIOT/Subscript_JsonFormat"
+String Json_Sub;
+const char* sensor;
+long time1;
+double latitude;
+double longitude;
 
 //Variable for Publishing Example 1 --> Topic: "PiaHouse/On_Off_PushButton"
 int buttonPin = 23;
@@ -21,8 +23,9 @@ int PotentiometerPin = 34;
 String PotentiometerValue;
 
 //Variable for Publishing Example 3 --> Topic: "PiaIOT/Publish_JsonFormat"
-double tempValue = 24;
 String Json_Pub;
+double tempValue = 24;
+
 
 
 //--------------------------------------------Setup Wifi & MQTT server[CanEdit]--------------------------------------------
@@ -95,27 +98,28 @@ void callback(String topic, byte* message, unsigned int length) {
           Serial.println("led blue");
       }
   }
-
+  
   //Subscription Example 3: Receive the payload in JSON format and deserialize them to make each data.
-  else if (topic == "FRA503/MaxMinNumber") { 
+  else if (topic == "PiaIOT/Subscript_JsonFormat"){
+    //TestCase: {"sensor":"gps","time":1351824120,"data":[48.756080,2.302038]}
     Serial.println(messageTemp);
 
-    StaticJsonDocument<200> doc;
-    String json = messageTemp;
-    // Deserialize the JSON document
-    DeserializationError error = deserializeJson(doc, json);
+    Json_Sub = messageTemp;
+    JsonDocument doc;
+    
+    deserializeJson(doc, Json_Sub);
 
-    if (error) {
-      Serial.print(F("deserializeJson() failed: "));
-      Serial.println(error.f_str());
-      return;
-    }
+    sensor    = doc["sensor"];
+    time1     = doc["time"];
+    latitude  = doc["data"][0];
+    longitude = doc["data"][1];
 
-    Max1 = doc["Max"];
-    Min1 = doc["Min"];
-
-    Serial.println(Max1);        //Debug the value from ESP32
-    Serial.println(Min1);        //Debug the value from ESP32
+    //Show the data before deserialize
+    Serial.println(sensor);
+    Serial.println(time1);
+    Serial.println(latitude); 
+    Serial.println(longitude); 
+    
   }
 
 }
@@ -134,7 +138,7 @@ void reconnect() {
 //--------------------------------------------Subscribe the topic here.[CanEdit]--------------------------------------------
       client.subscribe("PiaHouse/bedroom/temperature");
       client.subscribe("PiaDevice/ledColour");
-      client.subscribe("FRA503/MaxMinNumber");
+      client.subscribe("PiaIOT/Subscript_JsonFormat");
     
     } else {
       Serial.print("failed, rc=");
@@ -186,7 +190,7 @@ void loop() {
   
   //Publishing Example 2: Recieve the int value, convert int to string, and publish them by convert to char.
   PotentiometerValue = String(analogRead(PotentiometerPin)); //Add String() to convert int to String
-  Serial.println(PotentiometerValue);
+  //Serial.println(PotentiometerValue);
   client.publish("PiaHouse/PotentiometerValue", PotentiometerValue.c_str());  //Add .c_str to convert String to char because this library uses char, not a string.
   
   
@@ -203,6 +207,7 @@ void loop() {
     serializeJson(PiaDoc, Json_Pub);
     Serial.print(Json_Pub);
     client.publish("PiaIOT/Publish_JsonFormat", Json_Pub.c_str());
+    // This publish should be: {"temperature":24,"key":"value","raw":[1,2,3],"data":[48.75608,2.302038]}
     } 
   
 }
